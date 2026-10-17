@@ -1,12 +1,3 @@
-"""
-read write in binary because we get a 24-bit bitmap at the end (text is measured in bits) 
-use TCP 
-
-can you provide me skeleton code but explain everything? skeleton code should launch localhost connection, youll 
-
-launch 127.0.0.1:5555 
-"""
-
 import socket
 
 # AF_INET for ipv4
@@ -34,11 +25,11 @@ with open('output.bmp', 'wb') as f:
         # 7. Receive data in chunks (1024 bytes at a time)
         # TCP recv() will block until it gets data, or returns b'' if the client closes
         data = conn.recv(1024)
-        
+
         # 8. If data is empty (b''), the client has closed the connection. Break the loop.
         if not data:
             break
-            
+
         # 9. Write the received bytes to the file
         f.write(data)
 

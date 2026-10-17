@@ -1,6 +1,3 @@
-"""
-im using ai to help with coding just to be faster
-"""
 import socket
 
 # 1. Create a TCP socket
@@ -15,16 +12,16 @@ with open('Utah.bmp', 'rb') as f:
     while True:
         # 4. Read a chunk of the file (1024 bytes at a time)
         chunk = f.read(1024)
-        
+
         # 5. If chunk is empty (b''), we've reached the end of the file. Break.
         if not chunk:
             break
-            
+
         # 6. Send the chunk over the socket
         # sendall() ensures all bytes in the chunk are sent, unlike send()
         rover_socket.sendall(chunk)
 
-# 7. Clean up: close the socket. This sends a FIN packet to the server, 
+# 7. Clean up: close the socket. This sends a FIN packet to the server,
 # causing the server's recv() to return b'' and break its loop.
 rover_socket.close()
 print("Image transmitted successfully.")
