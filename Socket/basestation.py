@@ -20,7 +20,7 @@ conn, addr = server_socket.accept()
 print(f"Connected by {addr}")
 
 # 6. Open the output file in Write Binary mode ('wb')
-with open('output.bmp', 'wb') as f:
+with open(__file__.replace('basestation.py', 'output.bmp'), 'wb') as f:
     while True:
         # 7. Receive data in chunks (1024 bytes at a time)
         # TCP recv() will block until it gets data, or returns b'' if the client closes
