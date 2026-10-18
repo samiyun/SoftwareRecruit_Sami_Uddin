@@ -1,0 +1,14 @@
+# backend runtime data
+backend/images.db
+backend/data/images/*
+!backend/data/images/.gitkeep
+
+# frontend
+frontend/node_modules/
+frontend/dist/
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.deps/
