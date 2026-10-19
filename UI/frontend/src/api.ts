@@ -23,6 +23,12 @@ export async function fetchStats(): Promise<Stats> {
   return (await res.json()) as Stats
 }
 
+export async function fetchTags(): Promise<string[]> {
+  const res = await fetch(`${API_BASE}/api/tags`)
+  if (!res.ok) throw new Error(`GET /api/tags -> ${res.status}`)
+  return (await res.json()) as string[]
+}
+
 export async function renameImage(id: number, name: string): Promise<ImageItem> {
   const res = await fetch(`${API_BASE}/api/images/${id}`, {
     method: 'PATCH',

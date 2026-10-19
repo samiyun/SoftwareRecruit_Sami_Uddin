@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ImageItem, Stats } from './types'
 import {
   WS_URL,
   fetchImages,
   fetchStats,
+  fetchTags,
   renameImage,
   updateTags,
   deleteImage,
@@ -13,32 +14,50 @@ import {
 export default function App() {
   const [images, setImages] = useState<ImageItem[]>([])
   const [stats, setStats] = useState<Stats>({ unlabeled: 0, total: 0 })
+  const [tagOptions, setTagOptions] = useState<string[]>([])
   const [search, setSearch] = useState('')
   const [wsState, setWsState] = useState<'connecting' | 'open' | 'closed'>(
     'connecting',
   )
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<ImageItem | null>(null)
 
-  async function loadAll(q: string) {
+  const searchRef = useRef(search)
+  searchRef.current = search
+
+  async function loadImages(q: string) {
     try {
-      const [imgs, st] = await Promise.all([fetchImages(q), fetchStats()])
+      const imgs = await fetchImages(q)
       setImages(imgs)
-      setStats(st)
       setError(null)
     } catch (e) {
       console.error(e)
-      setError('Backend not reachable — is it running on port 8000?')
+      setError('Could not reach the backend on port 8000.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function refreshMeta() {
+    try {
+      const [st, tags] = await Promise.all([fetchStats(), fetchTags()])
+      setStats(st)
+      setTagOptions(tags)
+    } catch {
+      /* non-fatal */
     }
   }
 
   // initial load
   useEffect(() => {
-    loadAll('')
+    loadImages('')
+    refreshMeta()
   }, [])
 
   // debounced search
   useEffect(() => {
-    const t = setTimeout(() => loadAll(search), 250)
+    const t = setTimeout(() => loadImages(search), 250)
     return () => clearTimeout(t)
   }, [search])
 
@@ -62,8 +81,13 @@ export default function App() {
           const msg = JSON.parse(event.data)
           if (msg.type === 'new_image' && msg.image) {
             const image = msg.image as ImageItem
-            setImages((prev) => [image, ...prev.filter((i) => i.id !== image.id)])
-            fetchStats().then(setStats).catch(() => {})
+            if (!searchRef.current.trim()) {
+              setImages((prev) => [image, ...prev.filter((i) => i.id !== image.id)])
+            } else {
+              // keep an active search filtered
+              loadImages(searchRef.current)
+            }
+            refreshMeta()
           }
         } catch {
           /* ignore non-JSON frames */
@@ -85,7 +109,7 @@ export default function App() {
       setImages((prev) => prev.map((i) => (i.id === updated.id ? updated : i)))
     } catch (e) {
       console.error(e)
-      setError('Rename failed')
+      setError('Rename failed.')
     }
   }
 
@@ -93,50 +117,70 @@ export default function App() {
     try {
       const updated = await updateTags(item.id, tags)
       setImages((prev) => prev.map((i) => (i.id === updated.id ? updated : i)))
-      fetchStats().then(setStats).catch(() => {})
+      refreshMeta()
     } catch (e) {
       console.error(e)
-      setError('Tag update failed')
+      setError('Tag update failed.')
     }
   }
 
-  async function handleDelete(item: ImageItem) {
-    if (!window.confirm(`Delete "${item.name}"?`)) return
+  async function confirmDelete() {
+    if (!pendingDelete) return
+    const item = pendingDelete
+    setPendingDelete(null)
     try {
       await deleteImage(item.id)
       setImages((prev) => prev.filter((i) => i.id !== item.id))
-      fetchStats().then(setStats).catch(() => {})
+      refreshMeta()
     } catch (e) {
       console.error(e)
-      setError('Delete failed')
+      setError('Delete failed.')
     }
   }
 
   return (
     <div className="app">
       <header className="topbar">
-        <h1>TMR · Image Database</h1>
+        <h1>
+          TMR <span className="sep">·</span> Image Database
+        </h1>
         <span className={`pill ${wsState}`}>
           {wsState === 'open' ? 'live' : wsState}
         </span>
-        <span className="unlabeled" title="Images still tagged unlabeled">
-          {stats.unlabeled} unlabeled
+        <span className="count" title="Images still tagged unlabeled">
+          <strong>{stats.unlabeled}</strong> unlabeled
         </span>
         <input
           className="search"
           type="search"
           placeholder="Search by name or tag…"
+          aria-label="Search images by name or tag"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
       </header>
 
-      {error && <div className="error">{error}</div>}
+      {error && (
+        <div className="toast" role="alert">
+          <span>{error}</span>
+          <button
+            className="toast-x"
+            aria-label="Dismiss error"
+            onClick={() => setError(null)}
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       <main className="grid">
-        {images.length === 0 ? (
+        {loading && images.length === 0 ? (
+          <p className="empty">Loading…</p>
+        ) : images.length === 0 ? (
           <p className="empty">
-            No images yet. Start the sender: <code>python sender.py</code>
+            {search
+              ? 'No images match your search.'
+              : 'No images yet. Start the sender: python sender.py'}
           </p>
         ) : (
           images.map((item) => (
@@ -145,11 +189,45 @@ export default function App() {
               item={item}
               onRename={(name) => handleRename(item, name)}
               onSetTags={(tags) => handleSetTags(item, tags)}
-              onDelete={() => handleDelete(item)}
+              onDelete={() => setPendingDelete(item)}
             />
           ))
         )}
       </main>
+
+      <datalist id="tag-options">
+        {tagOptions.map((tag) => (
+          <option key={tag} value={tag} />
+        ))}
+      </datalist>
+
+      {pendingDelete && (
+        <div
+          className="modal-backdrop"
+          onClick={() => setPendingDelete(null)}
+          role="presentation"
+        >
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="del-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="del-title">Delete this image?</h2>
+            <p className="modal-name">“{pendingDelete.name}”</p>
+            <p className="modal-hint">This permanently removes it from the database.</p>
+            <div className="modal-actions">
+              <button className="btn" onClick={() => setPendingDelete(null)}>
+                Cancel
+              </button>
+              <button className="btn danger" onClick={confirmDelete}>
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -226,6 +304,7 @@ function ImageCard({ item, onRename, onSetTags, onDelete }: CardProps) {
               <button
                 className="x"
                 title="Remove tag"
+                aria-label={`Remove tag ${tag}`}
                 onClick={() => onSetTags(item.tags.filter((t) => t !== tag))}
               >
                 ×
@@ -237,7 +316,9 @@ function ImageCard({ item, onRename, onSetTags, onDelete }: CardProps) {
         <div className="row">
           <input
             className="tag-input"
+            list="tag-options"
             placeholder="add tag…"
+            aria-label="Add a tag"
             value={tagDraft}
             onChange={(e) => setTagDraft(e.target.value)}
             onKeyDown={(e) => {
