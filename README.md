@@ -53,9 +53,7 @@ Full documentation (architecture, API, decisions, testing): [`UI/README.md`](UI/
 
 A prebuilt frontend is included in `UI/frontend/dist/`.
 
-**Easiest (Windows):** double-click [`UI/run.bat`](UI/run.bat) — it installs the
-dependencies, starts the backend, opens the app, and starts the image sender.
-Or do it manually:
+Run it manually:
 
 ```bash
 cd UI/backend

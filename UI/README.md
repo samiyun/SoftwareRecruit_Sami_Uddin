@@ -88,17 +88,6 @@ UI/
 
 ## 6. Run it
 
-### One-click (Windows) — fastest
-
-Double-click **`run.bat`** in this `UI/` folder (or run it from a terminal). It:
-
-1. installs the Python dependencies if needed,
-2. starts the backend in its own window,
-3. opens <http://127.0.0.1:8000/app/> in your browser,
-4. runs the image sender in the launcher window (Ctrl+C to stop).
-
-Check the setup without launching anything: `run.bat --check`
-
 ### Terminal 1 — backend
 
 ```bash
